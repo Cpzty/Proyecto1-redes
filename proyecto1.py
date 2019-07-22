@@ -15,40 +15,88 @@ else:
     raw_input = input
 #client class
 class ChatBot(sleekxmpp.ClientXMPP):
-    def __init__(self, jid, password, room, nick):
-        #room
-        self.room = room
-        #nickname
-        self.nick = nick
+    def __init__(self, jid, password, recipient, message):
+        sleekxmpp.ClientXMPP.__init__(self, jid, password)
+        #recipient
+        self.recipient = recipient
+        #message
+        self.msg = message
+         #start
+        self.add_event_handler('session_start', self.start)
 
-#handlers
-        #session start
-        self.add_event_handler("session_start", self.start)
-        #group msg
-        self.add_event_handler("groupchat_message", self.muc_message)
-        #room presence
-        self.add_event_handler("muc::%s::got_online" % self.room, self.muc_online)
-
-  def start(self, event):
-          self.get_roster()
+    def start(self, event):
           self.send_presence()
-          self.plugin['xep_0045'].joinMUC(self.room, self.nick, wait=True)
+          self.get_roster()
+          #send msg
+          self.send_message(mto=self.recipient, mbody = self.msg, mtype = 'chat')
+          #remove user
+          self.del_roster_item(self.jid)
+          #disconnect
+          self.disconnect(wait=True)
 
-  def muc_message(self, msg):
-          #auto reply when mentioned
-          if msg['mucnick'] != self.nick and self.nick in msg['body']:
-              self.send_message(mto=msg['from'].bare, mbody="I heard that, %s." % msg['mucnick'], mtype='groupchat')
+if __name__ == '__main__':
+        optp = OptionParser()
 
-  #greetings
-  def muc_online(self, presence):
-      if presence['muc']['nick'] != self.nick:
-          self.send_message(mto=presence['from'].bare, mbody="Hello, %s %s" % (presence['muc']['role'], presence['muc']['nick']), mtype='groupchat')
+        #verbose
+        optp.add_option('-q', '--quiet', help='set logging to ERROR',
+                    action='store_const', dest='loglevel',
+                    const=logging.ERROR, default=logging.INFO)
+        
+        optp.add_option('-d', '--debug', help='set logging to DEBUG',
+                    action='store_const', dest='loglevel',
+                    const=logging.DEBUG, default=logging.INFO)
+        
+        optp.add_option('-v', '--verbose', help='set logging to COMM',
+                    action='store_const', dest='loglevel',
+                    const=5, default=logging.INFO)
 
-    
-    
+        #user
+        optp.add_option("-j", "--jid", dest="jid",
+                    help="JID to use")
+        
+        optp.add_option("-p", "--password", dest="password",
+                    help="password to use")
+        
+        optp.add_option("-t", "--to", dest="to",
+                    help="JID to send the message to")
+        
+        optp.add_option("-m", "--message", dest="message",
+                    help="message to send")
+
+        opts, args = optp.parse_args()
+
+        #logging config
+        logging.basicConfig(level=opts.loglevel,
+                        format='%(levelname)-8s %(message)s')
+
+        if opts.jid is None:
+                opts.jid = raw_input("Username: ")
+        
+        if opts.password is None:
+                opts.password = getpass.getpass("Password: ")
+        if opts.to is None:
+                opts.to = raw_input("Send To: ")
+        if opts.message is None:
+                opts.message = raw_input("Message: ")
+
+#initialize
+        xmpp = ChatBot(opts.jid, opts.password, opts.to, opts.message)
+        #plugins
+        xmpp.register_plugin('xep_0030') # Service Discovery
+        xmpp.register_plugin('xep_0199') # XMPP Ping
+
+        if xmpp.connect():
+                xmpp.process(block=True)
+                print("Done")
+        else:
+                print("Unable to connect.")
 
 
 
 
 
 
+
+
+
+        
