@@ -14,58 +14,35 @@ if sys.version_info < (3, 0):
 else:
     raw_input = input
 #client class
-class EchoBot(sleekxmpp.ClientXMPP):
-    def __init__(self, jid, password):
-        super(EchoBot, self).__init__(jid, password)
-        
+class ChatBot(sleekxmpp.ClientXMPP):
+    def __init__(self, jid, password, room, nick):
+        #room
+        self.room = room
+        #nickname
+        self.nick = nick
+
+#handlers
         #session start
-        self.add_event_handler('session_start', self.start)
-        #message handler
-        self.add_event_handler('message', self.message)
-        
-    #presence notifies other users that you are online and get_roster fetches users
-    def start(self, event):
-        self.send_presence()
-        self.get_roster()
+        self.add_event_handler("session_start", self.start)
+        #group msg
+        self.add_event_handler("groupchat_message", self.muc_message)
+        #room presence
+        self.add_event_handler("muc::%s::got_online" % self.room, self.muc_online)
 
-    #message
-    def message(self, msg):
-        if msg['type'] in ('normal', 'chat'):
-            self.send_message(mto=msg['from'], mbody='Thanks for sending: \n%s' % msg['body'])
-            
-    
-    
+  def start(self, event):
+          self.get_roster()
+          self.send_presence()
+          self.plugin['xep_0045'].joinMUC(self.room, self.nick, wait=True)
 
-if __name__ == '__main__':
-    optp = OptionParser()
+  def muc_message(self, msg):
+          #auto reply when mentioned
+          if msg['mucnick'] != self.nick and self.nick in msg['body']:
+              self.send_message(mto=msg['from'].bare, mbody="I heard that, %s." % msg['mucnick'], mtype='groupchat')
 
-    optp.add_option('-d', '--debug', help='set logging to DEBUG', action= 'store_const', dest='loglevel', const=logging.DEBUG, default=logging.INFO)
-    optp.add_option("-j", "--jid", dest="jid", help="JID to use")
-    optp.add_option("-p", "--password", dest="password", help="password to use")
-
-    opts, args = optp.parse_args()
-
-    logging.basicConfig(level=opts.loglevel, format='%(levelname)-8s %(message)s')
-
-    if opts.jid is None:
-        opts.jid = raw_input("Username: ")
-    if opts.password is None:
-        opts.password = getpass.getpass("Password: ")
-
-    xmpp = EchoBot(opts.jid, opts.password)
-    #service discovery
-    xmpp.register_plugin('xep_0030')
-    #ping
-    xmpp.register_plugin('xep_0199')
-
-    #xmpp.ssl_version = ssl.PROTOCOL_SSLv3
-
-    if xmpp.connect():
-        xmpp.process(block=True)
-        print("Connected")
-    else:
-        print("Unable to connect")
-
+  #greetings
+  def muc_online(self, presence):
+      if presence['muc']['nick'] != self.nick:
+          self.send_message(mto=presence['from'].bare, mbody="Hello, %s %s" % (presence['muc']['role'], presence['muc']['nick']), mtype='groupchat')
 
     
     
