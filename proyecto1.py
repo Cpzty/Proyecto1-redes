@@ -4,7 +4,10 @@ import getpass
 from optparse import OptionParser
 
 import sleekxmpp
+from sleekxmpp.exceptions import IqError, IqTimeout
 
+#time for delete user as server attempts to delete before it is created
+import time
 #ssl
 import ssl
 
@@ -21,18 +24,40 @@ class ChatBot(sleekxmpp.ClientXMPP):
         self.recipient = recipient
         #message
         self.msg = message
-         #start
-        self.add_event_handler('session_start', self.start)
+        #start
+        self.add_event_handler("session_start", self.start, threaded=True)
+        #register
+        self.add_event_handler("register", self.register, threaded=True)
 
     def start(self, event):
           self.send_presence()
           self.get_roster()
           #send msg
-          self.send_message(mto=self.recipient, mbody = self.msg, mtype = 'chat')
-          #remove user
-          self.del_roster_item(self.jid)
+          #self.send_message(mto=self.recipient, mbody = self.msg, mtype = 'chat')
           #disconnect
-          self.disconnect(wait=True)
+          #self.disconnect(wait=True)
+
+    def register(self,event):
+        resp = self.Iq()
+        resp['type'] = 'set'
+        resp['register']['username'] = self.boundjid.user
+        resp['register']['password'] = self.password
+        try:
+            resp.send(now=True)
+            logging.info("Account created for %s!" % self.boundjid)
+        except IqError as e:
+            logging.error("Could not register account: %s" %
+                    e.iq['error']['text'])
+            self.disconnect()
+        except IqTimeout:
+            logging.error("No response from server.")
+            self.disconnect()
+
+    def remove_item(self):
+        #remove user
+        self.del_roster_item(self.jid)
+
+
 
 if __name__ == '__main__':
         optp = OptionParser()
@@ -69,25 +94,67 @@ if __name__ == '__main__':
         logging.basicConfig(level=opts.loglevel,
                         format='%(levelname)-8s %(message)s')
 
-        if opts.jid is None:
-                opts.jid = raw_input("Username: ")
+        #if opts.jid is None:
+          #      opts.jid = raw_input("Username: ")
         
-        if opts.password is None:
-                opts.password = getpass.getpass("Password: ")
-        if opts.to is None:
-                opts.to = raw_input("Send To: ")
-        if opts.message is None:
-                opts.message = raw_input("Message: ")
+        #if opts.password is None:
+          #      opts.password = getpass.getpass("Password: ")
+        #if opts.to is None:
+                #opts.to = raw_input("Send To: ")
+        #if opts.message is None:
+                #opts.message = raw_input("Message: ")
 
 #initialize
+        print("Press 1 to register")
+        print("Press 2 to login")
+        login_register = raw_input(">: ")
+
+                
+        opts.jid = raw_input("Username: ")
+        opts.password = getpass.getpass("Password: ")
+        
         xmpp = ChatBot(opts.jid, opts.password, opts.to, opts.message)
+
+        if(login_register == str(2)):
+                xmpp.del_event_handler("register", xmpp.register)
+        
         #plugins
         xmpp.register_plugin('xep_0030') # Service Discovery
+        xmpp.register_plugin('xep_0004') # Data forms
+        xmpp.register_plugin('xep_0060') # PubSub
         xmpp.register_plugin('xep_0199') # XMPP Ping
+        #registration related
+        xmpp.register_plugin('xep_0066') # Out-of-band Data
+        xmpp.register_plugin('xep_0077') # In-band Registration
 
-        if xmpp.connect():
-                xmpp.process(block=True)
-                print("Done")
+        
+        #authentication over an unencrypted connection
+        xmpp['feature_mechanisms'].unencrypted_plain = True
+        xmpp.ssl_version = ssl.PROTOCOL_TLS
+
+        
+        if xmpp.connect(('alumchat.xyz', 5222)):
+        #if xmpp.connect():
+                xmpp.process(block=False)
+                #xmpp.remove_item()
+                time.sleep(5)
+                while True:
+                        print("press 1 to disconnect")
+                        print("press 2 to eliminate the account from the server")
+                        print("press 3 to see all users")
+                        print("press 4 to add a user")
+                        print("press 5 to see details of a user")
+                        print("press 6 to join a group chat")
+                        print("press 7 to set presence message")
+                        print("press 8 to send a message")
+                        #may fuse with send message
+                        print("press 9 to send a file")
+                        ch = raw_input(">: ")
+                        if(ch == str(1)):
+                                print("disconnecting")
+                                xmpp.disconnect()
+                                break
+                
         else:
                 print("Unable to connect.")
 
