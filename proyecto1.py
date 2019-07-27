@@ -18,12 +18,12 @@ else:
     raw_input = input
 #client class
 class ChatBot(sleekxmpp.ClientXMPP):
-    def __init__(self, jid, password, recipient, message):
+    def __init__(self, jid, password,):
         sleekxmpp.ClientXMPP.__init__(self, jid, password)
         #recipient
-        self.recipient = recipient
+        #self.recipient = recipient
         #message
-        self.msg = message
+        self.add_event_handler("message", self.message, threaded=True)
         #start
         self.add_event_handler("session_start", self.start, threaded=True)
         #register
@@ -57,7 +57,9 @@ class ChatBot(sleekxmpp.ClientXMPP):
         #remove user
         self.del_roster_item(self.jid)
 
-
+    def message(self, msg):
+        if msg['type'] in ('chat', 'normal'):
+            print ("%(body)s" % msg)
 
 if __name__ == '__main__':
         optp = OptionParser()
@@ -113,7 +115,7 @@ if __name__ == '__main__':
         opts.jid = raw_input("Username: ")
         opts.password = getpass.getpass("Password: ")
         
-        xmpp = ChatBot(opts.jid, opts.password, opts.to, opts.message)
+        xmpp = ChatBot(opts.jid, opts.password,)
 
         if(login_register == str(2)):
                 xmpp.del_event_handler("register", xmpp.register)
@@ -150,11 +152,34 @@ if __name__ == '__main__':
                         #may fuse with send message
                         print("press 9 to send a file")
                         ch = raw_input(">: ")
+                #disconnect
                         if(ch == str(1)):
                                 print("disconnecting")
                                 xmpp.disconnect()
                                 break
-                
+                #eliminate account
+                        elif(ch == str(2)):
+                                print("in progress")
+                #see all contacts
+                        elif(ch == str(3)):
+                                print("showing all contacts\n")
+                                print(xmpp.client_roster)
+                                print(" ")
+                #request subscription to user
+                        elif(ch ==str(4)):
+                                print("enter the name of the user")
+                                friend_request = raw_input(":> ")
+                                xmpp.send_presence(pto=friend_request, ptype='subscribe')
+                #send a message
+                        elif(ch==str(8)):
+                                print("who is the message for?")
+                                user_to_send = raw_input(">: ")
+                                print("what is your message?")
+                                msg_to_send = raw_input(">: ")
+                                print("sending msg")
+                                xmpp.send_message(mto=user_to_send, mbody = msg_to_send, mtype = 'chat')
+                                #xmpp.message(msg.type='chat')
+
         else:
                 print("Unable to connect.")
 
