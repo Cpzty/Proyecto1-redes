@@ -53,9 +53,23 @@ class ChatBot(sleekxmpp.ClientXMPP):
             logging.error("No response from server.")
             self.disconnect()
 
-    def remove_item(self):
+    def remove_user(self):
         #remove user
-        self.del_roster_item(self.jid)
+        resp = self.Iq()
+        resp['type'] = 'set'
+        resp['from'] = self.boundjid.user
+        resp['register'] = ' '
+        resp['register']['remove'] = ' '
+        try:
+            resp.send(now=True)
+            print("Account deleted for %s!" % self.boundjid)
+        except IqError as e:
+            logging.error("Could not delete account: %s" %
+                    e.iq['error']['text'])
+            self.disconnect()
+        except IqTimeout:
+            logging.error("No response from server.")
+            self.disconnect()
 
     def message(self, msg):
         if msg['type'] in ('chat', 'normal'):
@@ -128,6 +142,7 @@ if __name__ == '__main__':
         #registration related
         xmpp.register_plugin('xep_0066') # Out-of-band Data
         xmpp.register_plugin('xep_0077') # In-band Registration
+        xmpp.register_plugin('xep_0045') # multichat
 
         
         #authentication over an unencrypted connection
@@ -159,7 +174,8 @@ if __name__ == '__main__':
                                 break
                 #eliminate account
                         elif(ch == str(2)):
-                                print("in progress")
+                                xmpp.remove_user()
+                                xmpp.disconnect()
                 #see all contacts
                         elif(ch == str(3)):
                                 print("showing all contacts\n")
@@ -170,6 +186,16 @@ if __name__ == '__main__':
                                 print("enter the name of the user")
                                 friend_request = raw_input(":> ")
                                 xmpp.send_presence(pto=friend_request, ptype='subscribe')
+                #join a room
+                        #elif(ch == str(6)):
+                                
+                #presence message
+                        elif(ch == str(7)):
+                                print("what status would u like to show?")
+                                status = raw_input(">: ")
+                                print("presence show?")
+                                show = raw_input(">: ")
+                                xmpp.makePresence(pfrom=xmpp.jid, pstatus=status, pshow=show)
                 #send a message
                         elif(ch==str(8)):
                                 print("who is the message for?")
