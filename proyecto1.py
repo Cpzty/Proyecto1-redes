@@ -37,7 +37,7 @@ class ChatBot(sleekxmpp.ClientXMPP):
         #register
         self.add_event_handler("register", self.register, threaded=True)
         #group chat message
-        self.add_event_handler("groupchat_message", self.muc_message, threaded=True)
+        #self.add_event_handler("groupchat_message", self.muc_message, threaded=True)
         #group chat presence
         self.add_event_handler("muc::%s::got_online" % self.room, self.muc_online, threaded=True)
         #file send handlers
@@ -87,13 +87,53 @@ class ChatBot(sleekxmpp.ClientXMPP):
             logging.error("No response from server.")
             self.disconnect()
 
+    def request_user_details(self,userto):
+            #self.Iq['profile'].enable()
+            resp = self.Iq()
+            resp['type'] = 'get'
+            resp['from'] = self.boundjid.user
+            resp['to'] = userto
+            resp['profile'] = ' '
+            try:
+                print(resp)
+                resp.send(now=True)
+                print("User retrieved!")
+            except IqError as e:
+                logging.error("Could not retrieve account: %s" %
+                e.iq['error']['text'])
+                self.disconnect()
+            except IqTimeout:
+                logging.error("No response from server.")
+                self.disconnect()
+
+    def see_all_users(self):
+            resp = self.Iq()
+            resp['type'] = 'get'
+            resp['from'] = self.boundjid.user
+            resp['to'] = 'alumchat.xyz'
+            resp['disco_items'] = ' '
+            try:
+                print(resp)
+                resp.send(now=True)
+            except IqError as e:
+                    logging.error("Could not retrieve accounts: %s" %
+                    e.iq['error']['text'])
+                    self.disconnect()
+            except IqTimeout:
+                logging.error("No response from server.")
+                self.disconnect()
+
+            
+
     def message(self, msg):
-        if msg['type'] in ('chat', 'normal'):
+        if msg['type'] in ('chat', 'normal', 'groupchat'):
             print ("%(body)s" % msg)
 
-    def muc_message(self, msg):
-            if msg['mucnick'] != self.nick and self.nick in msg['body']:
-                print ("%(body)s" % msg)
+    #def muc_message(self, msg):
+            #if msg['mucnick'] != self.nick and self.nick in msg['body']:
+                #self.send_message(mto=msg['from'].bare,
+                #mbody="oiii, %s." % msg['mucnick'],
+               # mtype='groupchat')
 
     def muc_online(self, presence):
             if presence['muc']['nick'] != self.nick:
@@ -196,7 +236,7 @@ if __name__ == '__main__':
         xmpp.register_plugin('xep_0077') # In-band Registration
         xmpp.register_plugin('xep_0045') # multichat
         #xmpp.register_plugin('xep_0047') # file
-
+        #xmpp.register_plugin('xep_0154') #user details
         
         #authentication over an unencrypted connection
         xmpp['feature_mechanisms'].unencrypted_plain = True
@@ -211,7 +251,7 @@ if __name__ == '__main__':
                 while True:
                         print("press 1 to disconnect")
                         print("press 2 to eliminate the account from the server")
-                        print("press 3 to see all users")
+                        print("press 3 to see all contacts")
                         print("press 4 to add a user")
                         print("press 5 to see details of a user")
                         print("press 6 to join a group chat")
@@ -220,6 +260,7 @@ if __name__ == '__main__':
                         #may fuse with send message
                         print("press 9 to send a file")
                         print("press 10 for group message")
+                        print("press 11 to see all users")
                         ch = raw_input(">: ")
                 #disconnect
                         if(ch == str(1)):
@@ -241,6 +282,11 @@ if __name__ == '__main__':
                                 print("enter the name of the user")
                                 friend_request = raw_input(":> ")
                                 xmpp.send_presence(pto=friend_request, ptype='subscribe')
+                #see user details
+                        elif(ch==str(5)):
+                                print("enter the name of the user")
+                                user_to_see = raw_input(">: ")
+                                xmpp.request_user_details(user_to_see)
                 #join a room
                         elif(ch == str(6)):
                                 print("joining room")
@@ -276,11 +322,17 @@ if __name__ == '__main__':
                                 
                 #group message
                         elif(ch==str(10)):
+                                print("Wich group would u like to send the message to?")
+                                grouptosend = raw_input(">: ")
                                 print("what would u like to send?")
                                 grpmsg = raw_input(">: ")
-                                xmpp.send_message(mto='all',
+                                xmpp.send_message(mto=grouptosend,
                                 mbody=grpmsg,
                                 mtype='groupchat')
+                #all users
+                        elif(ch==str(11)):
+                                print("users")
+                                xmpp.see_all_users()
 
         else:
                 print("Unable to connect.")
